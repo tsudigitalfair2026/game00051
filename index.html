@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>🐼 パンダシューティングDX</title>
+
+<style>
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+-webkit-tap-highlight-color:transparent;
+}
+
+html,body{
+width:100%;
+height:100%;
+overflow:hidden;
+touch-action:none;
+font-family:sans-serif;
+background:#0f172a;
+color:#fff;
+}
+
+.screen{
+display:none;
+width:100%;
+height:100vh;
+padding:16px;
+}
+
+.active{
+display:flex;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+text-align:center;
+}
+
+h1{
+margin-bottom:15px;
+font-size:2em;
+}
+
+.desc{
+max-width:500px;
+line-height:1.8;
+}
+
+button{
+border:none;
+border-radius:16px;
+padding:16px 28px;
+font-size:20px;
+font-weight:bold;
+background:#22c55e;
+color:#fff;
+min-width:200px;
+margin-top:15px;
+}
+
+#gameScreen{
+display:none;
+flex-direction:column;
+padding:0;
+}
+
+#hud{
+height:65px;
+background:rgba(15,23,42,.95);
+display:flex;
+justify-content:space-between;
+align-items:center;
+padding:10px;
+font-size:15px;
+font-weight:bold;
+z-index:50;
+}
+
+#gameArea{
+position:relative;
+flex:1;
+overflow:hidden;
+touch-action:none;
+background:
+radial-gradient(circle at 20% 20%, rgba(255,255,255,.35) 0 2px, transparent 3px),
+radial-gradient(circle at 80% 30%, rgba(255,255,255,.25) 0 3px, transparent 4px),
+radial-gradient(circle at 40% 70%, rgba(255,255,255,.2) 0 2px, transparent 3px),
+linear-gradient(
+180deg,
+#0f172a 0%,
+#1e3a8a 20%,
+#2563eb 45%,
+#38bdf8 70%,
+#7dd3fc 100%
+);
+}
+
+.cloud{
+position:absolute;
+font-size:52px;
+pointer-events:none;
+opacity:.9;
+animation:cloudMove linear infinite;
+z-index:1;
+}
+
+@keyframes cloudMove{
+from{
+transform:translateX(-200px);
+}
+to{
+transform:translateX(calc(100vw + 250px));
+}
+}
+
+.mountain{
+position:absolute;
+bottom:70px;
+width:0;
+height:0;
+border-left:140px solid transparent;
+border-right:140px solid transparent;
+border-bottom:220px solid rgba(0,0,0,.18);
+pointer-events:none;
+z-index:2;
+}
+
+.ground{
+position:absolute;
+left:0;
+right:0;
+bottom:0;
+height:70px;
+background:
+repeating-linear-gradient(
+90deg,
+#16a34a 0 20px,
+#22c55e 20px 40px
+);
+box-shadow:0 -4px 15px rgba(0,0,0,.25);
+z-index:3;
+pointer-events:none;
+}
+
+#player{
+position:absolute;
+bottom:80px;
+left:50%;
+transform:translateX(-50%);
+font-size:56px;
+z-index:20;
+user-select:none;
+}
+
+.enemy{
+position:absolute;
+font-size:42px;
+z-index:15;
+}
+
+.bullet{
+position:absolute;
+font-size:22px;
+z-index:15;
+}
+
+.explosion{
+position:absolute;
+font-size:42px;
+pointer-events:none;
+z-index:30;
+animation:boom .4s forwards;
+}
+
+@keyframes boom{
+0%{
+transform:scale(.5);
+opacity:1;
+}
+100%{
+transform:scale(2);
+opacity:0;
+}
+}
+
+#specialBtn{
+position:absolute;
+right:12px;
+bottom:90px;
+width:100px;
+height:100px;
+border-radius:50%;
+background:#ef4444;
+color:#fff;
+font-size:15px;
+font-weight:bold;
+z-index:40;
+margin:0;
+}
+
+#rank{
+font-size:48px;
+font-weight:bold;
+color:gold;
+margin:20px 0;
+}
+</style>
+</head>
+
+<body>
+
+<div id="startScreen" class="screen active">
+<h1>🐼 パンダシューティングDX</h1>
+
+<div class="desc">
+おしゃれな空を飛ぶ敵を竹ミサイルで撃とう！<br>
+パンダをドラッグして移動！<br>
+敵がパンダに当たると❤️が減ります。<br>
+敵が下へ落ちてもゲームオーバーにはなりません。<br>
+必殺技で画面中の敵を一掃できます！
+</div>
+
+<button id="startBtn">スタート</button>
+</div>
+
+<div id="gameScreen" class="screen">
+
+<div id="hud">
+<div>得点:<span id="score">0</span></div>
+<div>残り:<span id="time">60</span>秒</div>
+<div>❤️<span id="life">3</span></div>
+<div>SP:<span id="sp">3</span></div>
+</div>
+
+<div id="gameArea">
+<div id="player">🐼</div>
+<button id="specialBtn">必殺技</button>
+</div>
+
+</div>
+
+<div id="resultScreen" class="screen">
+<h1>結果発表</h1>
+
+<div style="font-size:34px;">
+スコア:
+<span id="finalScore">0</span>
+</div>
+
+<div id="rank">C</div>
+
+<button id="restartBtn">もう一度遊ぶ</button>
+</div>
+
+<script>
+const startScreen=document.getElementById("startScreen");
+const gameScreen=document.getElementById("gameScreen");
+const resultScreen=document.getElementById("resultScreen");
+
+const gameArea=document.getElementById("gameArea");
+const player=document.getElementById("player");
+
+const scoreEl=document.getElementById("score");
+const timeEl=document.getElementById("time");
+const lifeEl=document.getElementById("life");
+const spEl=document.getElementById("sp");
+
+const finalScore=document.getElementById("finalScore");
+const rankEl=document.getElementById("rank");
+
+let score;
+let life;
+let timeLeft;
+let specialCount;
+
+let bullets=[];
+let enemies=[];
+
+let enemyTimer;
+let shootTimer;
+let gameTimer;
+let animationId;
+
+let playing=false;
+
+function createBackground(){
+
+document.querySelectorAll(".cloud,.mountain,.ground")
+.forEach(e=>e.remove());
+
+for(let i=0;i<5;i++){
+
+const cloud=document.createElement("div");
+cloud.className="cloud";
+cloud.textContent="☁️";
+
+cloud.style.top=(20+i*90)+"px";
+cloud.style.animationDuration=(18+i*6)+"s";
+
+gameArea.appendChild(cloud);
+}
+
+const m1=document.createElement("div");
+m1.className="mountain";
+m1.style.left="-80px";
+
+const m2=document.createElement("div");
+m2.className="mountain";
+m2.style.left="120px";
+m2.style.borderBottomColor="rgba(0,0,0,.25)";
+
+const m3=document.createElement("div");
+m3.className="mountain";
+m3.style.right="-60px";
+m3.style.left="auto";
+
+const ground=document.createElement("div");
+ground.className="ground";
+
+gameArea.appendChild(m1);
+gameArea.appendChild(m2);
+gameArea.appendChild(m3);
+gameArea.appendChild(ground);
+}
+
+function startGame(){
+
+score=0;
+life=3;
+timeLeft=60;
+specialCount=3;
+
+scoreEl.textContent=score;
+lifeEl.textContent=life;
+timeEl.textContent=timeLeft;
+spEl.textContent=specialCount;
+
+document.querySelectorAll(".enemy,.bullet,.explosion")
+.forEach(e=>e.remove());
+
+bullets=[];
+enemies=[];
+
+startScreen.classList.remove("active");
+resultScreen.classList.remove("active");
+
+gameScreen.style.display="flex";
+
+createBackground();
+
+playing=true;
+
+player.style.left=(gameArea.clientWidth/2)+"px";
+
+clearInterval(enemyTimer);
+clearInterval(shootTimer);
+clearInterval(gameTimer);
+cancelAnimationFrame(animationId);
+
+shootTimer=setInterval(shoot,180);
+
+enemyTimer=setInterval(()=>{
+spawnEnemy();
+if(Math.random()<0.45){
+spawnEnemy();
+}
+},420);
+
+gameTimer=setInterval(()=>{
+timeLeft--;
+timeEl.textContent=timeLeft;
+
+if(timeLeft<=0){
+endGame();
+}
+},1000);
+
+animationId=requestAnimationFrame(update);
+}
+
+function shoot(){
+
+if(!playing)return;
+
+const bullet=document.createElement("div");
+bullet.className="bullet";
+bullet.textContent="🎋";
+
+const x=player.offsetLeft+10;
+const y=gameArea.clientHeight-150;
+
+bullet.style.left=x+"px";
+bullet.style.top=y+"px";
+
+gameArea.appendChild(bullet);
+
+bullets.push({
+el:bullet,
+x:x,
+y:y
+});
+}
+
+function spawnEnemy(){
+
+if(!playing)return;
+
+const enemy=document.createElement("div");
+enemy.className="enemy";
+
+const chars=["👹","👾","💀","🐺","🦅"];
+
+enemy.textContent=
+chars[Math.floor(Math.random()*chars.length)];
+
+const x=Math.random()*(gameArea.clientWidth-60);
+
+enemy.style.left=x+"px";
+enemy.style.top="-60px";
+
+gameArea.appendChild(enemy);
+
+enemies.push({
+el:enemy,
+x:x,
+y:-60,
+speed:4+Math.random()*4+(60-timeLeft)/18
+});
+}
+
+function explosion(x,y){
+
+const boom=document.createElement("div");
+boom.className="explosion";
+boom.textContent="💥";
+
+boom.style.left=x+"px";
+boom.style.top=y+"px";
+
+gameArea.appendChild(boom);
+
+setTimeout(()=>{
+boom.remove();
+},400);
+}
+
+function update(){
+
+if(!playing)return;
+
+for(let i=bullets.length-1;i>=0;i--){
+
+const b=bullets[i];
+
+b.y-=11;
+b.el.style.top=b.y+"px";
+
+if(b.y<-60){
+
+b.el.remove();
+bullets.splice(i,1);
+}
+}
+
+for(let i=enemies.length-1;i>=0;i--){
+
+const e=enemies[i];
+
+e.y+=e.speed;
+e.el.style.top=e.y+"px";
+
+if(e.y>gameArea.clientHeight+50){
+
+e.el.remove();
+enemies.splice(i,1);
+continue;
+}
+
+const playerX=player.offsetLeft;
+const playerY=gameArea.clientHeight-140;
+
+const dx=(e.x+20)-(playerX+20);
+const dy=(e.y+20)-(playerY+20);
+
+if(dx*dx+dy*dy<1800){
+
+explosion(e.x,e.y);
+
+e.el.remove();
+enemies.splice(i,1);
+
+life--;
+lifeEl.textContent=life;
+
+if(life<=0){
+endGame();
+return;
+}
+}
+}
+
+for(let i=enemies.length-1;i>=0;i--){
+
+for(let j=bullets.length-1;j>=0;j--){
+
+if(i>=enemies.length || j>=bullets.length){
+continue;
+}
+
+const e=enemies[i];
+const b=bullets[j];
+
+const dx=(e.x+20)-(b.x+10);
+const dy=(e.y+20)-(b.y+10);
+
+if(dx*dx+dy*dy<1200){
+
+explosion(e.x,e.y);
+
+e.el.remove();
+b.el.remove();
+
+enemies.splice(i,1);
+bullets.splice(j,1);
+
+score+=10;
+scoreEl.textContent=score;
+
+break;
+}
+}
+}
+
+animationId=requestAnimationFrame(update);
+}
+
+function specialAttack(){
+
+if(!playing)return;
+if(specialCount<=0)return;
+
+specialCount--;
+spEl.textContent=specialCount;
+
+const destroyed=enemies.length;
+
+enemies.forEach(enemy=>{
+explosion(enemy.x,enemy.y);
+enemy.el.remove();
+});
+
+enemies=[];
+
+score+=destroyed*20;
+scoreEl.textContent=score;
+}
+
+function endGame(){
+
+if(!playing)return;
+
+playing=false;
+
+clearInterval(enemyTimer);
+clearInterval(shootTimer);
+clearInterval(gameTimer);
+
+cancelAnimationFrame(animationId);
+
+gameScreen.style.display="none";
+resultScreen.classList.add("active");
+
+finalScore.textContent=score;
+
+let rank="C";
+
+if(score>=250) rank="B";
+if(score>=500) rank="A";
+if(score>=900) rank="S";
+
+rankEl.textContent=rank;
+}
+
+function movePlayer(clientX){
+
+const rect=gameArea.getBoundingClientRect();
+
+let x=clientX-rect.left;
+
+x=Math.max(30,Math.min(rect.width-30,x));
+
+player.style.left=x+"px";
+}
+
+let dragging=false;
+
+gameArea.addEventListener("pointerdown",e=>{
+dragging=true;
+movePlayer(e.clientX);
+});
+
+gameArea.addEventListener("pointermove",e=>{
+if(dragging){
+movePlayer(e.clientX);
+}
+});
+
+window.addEventListener("pointerup",()=>{
+dragging=false;
+});
+
+document.getElementById("specialBtn")
+.addEventListener("click",specialAttack);
+
+document.getElementById("startBtn")
+.addEventListener("click",startGame);
+
+document.getElementById("restartBtn")
+.addEventListener("click",startGame);
+</script>
+
+</body>
+</html>
